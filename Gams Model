@@ -1,0 +1,67 @@
+Sets 
+
+N_exitsting load-points /n1*n11/
+
+N_future   future load-points /n12*n24/
+
+L_existing  existing-Lines /l1*l9/
+
+L_candidates   candidate-Lines /l10*l38/  ;
+
+
+* x: planning variable
+
+* X: variable indicating the presence of element in year t
+
+* Lf: Loss factor (for converting max Loss into average loss)
+
+* OC(sub): operation cost of a substation
+
+
+equations
+
+
+
+obj_func =e= Inv_Cost + Opr_Cost + Loss_Cost + LOLE_Cost
+
+Inv_Cost =e= X(sub)*IC(sub) + x(plan_line)*X(line)*IC(line)
+
+Opr_Cost =e= Ssmax(sub)*OC(sub)
+
+Loss_Cost =e= X(line)*Lf*Ploss*Cost(loss)
+
+
+
+* S : Incidence matrix
+Pin + Pprd =e= Pdemand + Pout (KCL for all nodes)
+
+Qin + Qprd =e= Qdemand + Qout (KCL for all nodes)
+
+Vn' - Vn = (Rl*PFl + Xl*QFl)/V1 (KVL for all lines (l) from node n' to node n) 
+
+
+PFmin =g= PFl =l= PFmax
+
+QFmin =g= QFl =l= QFmax
+
+
+CAPsub =l= CAPmax (capacity of substation)
+
+0.95 =g= Vn =l= 1.05
+
+ICinv =l= ICmax (budget limitation)
+
+
+Xline_mod + Xline_rep =l= 1 (each line either gets replaced or modified. not both)
+
+Xsub_mod + Xsub_rep =l= 1 (the same as above for substations)
+
+
+Yak + Yfi + Yre =l= Nt (number of branches in work must <= the number of nodes to avoid loops.
+
+* Y is a variable that shows whether the line is being operated. it is bound by Y<=X to 
+ensure not using it when it's not planned.
+
+
+
+
