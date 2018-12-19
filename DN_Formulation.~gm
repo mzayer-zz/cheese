@@ -4,7 +4,8 @@
 * LossCost has problems. it's variables and parameters are not determined yet.
 * I can simply neglect Q. just a Q<=0.8P would suffice (to lessen the run-time)
 * everything should be per unit, yet nothing is.
-
+* Voltage of reference bus
+* Radiality3 is wrong.
 Sets
 t each period /t1*t5/
 N  all nodes /n1*n8/
@@ -14,9 +15,9 @@ S(N) all substation nodes /n1*n3/
 S_ex(S)  existing substation nodes /n1, n2 /
 S_can(S) future substation nodes /n3 /
 np(N) nodes of only load /n3*n8/
-L all lines /l1*l9/
-L_ex(L)  existing-Lines /l1*l3/
-L_can(L)   candidate-Lines /l4*l9/
+L all lines /l1*l10/
+L_ex(L)  existing-Lines /l1*l4/
+L_can(L)   candidate-Lines /l5*l10/
 nodePars node parameters /Psmax1,Qsmax1,NIC1,Psmax2,Qsmax2,NIC2,Vmax,Vmin,Psmax,Qsmax,PsmaxR,QsmaxR,NRC/
 LinePars Line parameters /fbus,tbus,R,X,PFmax,QFmax,LIC,PFRmax,QFRmax,LRC,PFImax,QFImax/
 
@@ -45,10 +46,11 @@ $include "C:\Users\Mansour\Desktop\cheese\Inc_matrix.txt"
 ;
 
 
-Scalars M big number /1000/
+Scalars M big number /1000000/
+Vref /13.8/
 Lf Loss factor just for test now /0.7/
-LossCost_C just for test now /25/
-LOLEcost just for test /150/
+LossCost_C just for test now /2500/
+LOLEcost just for test /150000000/
 SubOC Subsationg operation cost /3500/
 ;
 
@@ -63,17 +65,21 @@ QF(L,t)
 Pprod(S,t)
 Qprod(S,t)
 r(n,t)
-V(n,t)
+V(n,t) ;
 
-  ;
+positive variables
+Pprod(S,t)
+Qprod(S,t)
+r(n,t)
+V(n,t) ;
 BINARY Variables
 XI(L_can,t)
 XR(L_ex,t)
 Z1(S_can,t)
 Z2(S_can,t)
 ZR(S_ex,t)
-B(i,j)
-Bp(j,i)
+B(i,j,t)
+Bp(j,i,t)
  ;
 
 equations
@@ -104,9 +110,9 @@ eq_exSub1
 eq_exSub2
 
 eq_Line_rep
-eq_Line_ins
+*eq_Line_ins
 eq_OnlyRep1
-eq_OnlyRep2
+*eq_OnlyRep2
 eq_ZOnce1
 eq_ZOnce2
 eq_OnlySubIns1
@@ -114,6 +120,7 @@ eq_OnlySubIns2
 eq_OnlyRepSub
 eq_ZROnce
 
+eq_referenceV
 *eq_Vmax
 *eq_Vmin
 
@@ -127,9 +134,9 @@ Radiality4
 
 TotCost.. ObjFunc =e= InvCost + OprCost + LossCost  ;
 
-eq_InvCost..  InvCost =e= sum((S_can,t), Z1(S_can,t)*node_data(S_can,'NIC1') + Z2(S_can,t)*node_data(S_can,'NIC2'))
-+sum((S_ex,t),ZR(S_ex,t)*node_data(S_ex,'NRC'))+ sum((L_ex,t),XR(L_ex,t)*Line_data(L_ex,"LRC"))
-+ sum((L_can,t),XI(L_can,t)*Line_data(L_can,"LIC")) ;
+eq_InvCost..  InvCost =e= sum((S_can,t), (Z1(S_can,t)-Z1(S_can,t-1))*node_data(S_can,'NIC1') + (Z2(S_can,t)-Z2(S_can,t-1))*node_data(S_can,'NIC2'))
++sum((S_ex,t),(ZR(S_ex,t)-ZR(S_ex,t-1))*node_data(S_ex,'NRC'))+ sum((L_ex,t),(XR(L_ex,t)-XR(L_ex,t-1))*Line_data(L_ex,"LRC"))
++ sum((L_can,t),(XI(L_can,t)-XI(L_can,t-1))*Line_data(L_can,"LIC")) ;
 
 eq_OprCost.. OprCost =e= sum((S_can,t),Z1(S_can,t)*node_data(S_can,'Psmax1')*SubOC + Z2(S_can,t)*node_data(S_can,'PSmax2')*SubOC)
 + sum((S_ex,t),node_data(S_ex,'Psmax')*SubOC) +  sum((np,t), r(np,t)*LOLEcost) ;
@@ -138,14 +145,17 @@ eq_LossCost.. LossCost =e= sum((L_ex,t), Lf*PF(L_ex,t)*Line_data(L_ex,'R')*LossC
 + sum((L_can,t), Lf*PF(L_can,t)*Line_data(L_can,'R')*LossCost_C) ;
 
 *KCL:    r(n,t) is load not served.
-KCL1(S,t).. sum(L$(Line_data(L,'tbus')=ord(S)),PF(L,t)) + Pprod(S,t) =e= sum(L$(Line_data(L,'fbus')=ord(S)),PF(L,t)) ;
-KCL2(S,t).. sum(L$(Line_data(L,'tbus')=ord(S)),QF(L,t)) + Qprod(S,t) =e= sum(L$(Line_data(L,'fbus')=ord(S)),QF(L,t)) ;
-KCL3(np,t).. sum(L$(Line_data(L,'tbus')=ord(np)),PF(L,t)) =e= sum(L$(Line_data(L,'fbus')=ord(np)),PF(L,t)) + LoadP_data(np,t) - r(np,t) ;
-KCL4(np,t).. sum(L$(Line_data(L,'tbus')=ord(np)),QF(L,t)) =e= sum(L$(Line_data(L,'fbus')=ord(np)),QF(L,t)) + LoadQ_data(np,t) - r(np,t) ;
+*KCL1(S,t).. sum(L$(Line_data(L,'tbus')=ord(S)),PF(L,t)) + Pprod(S,t) =e= sum(L$(Line_data(L,'fbus')=ord(S)),PF(L,t)) ;
+KCL1(S,t).. Pprod(S,t) =e= sum(L$(Line_data(L,'fbus')=ord(S)),PF(L,t)) ;
+*KCL2(S,t).. sum(L$(Line_data(L,'tbus')=ord(S)),QF(L,t)) + Qprod(S,t) =e= sum(L$(Line_data(L,'fbus')=ord(S)),QF(L,t)) ;
+KCL2(S,t).. Qprod(S,t) =e= sum(L$(Line_data(L,'fbus')=ord(S)),QF(L,t)) ;
+KCL3(np,t).. sum(L$(Line_data(L,'tbus')=card(S)+ord(np)),PF(L,t)) =e= sum(L$(Line_data(L,'fbus')=card(S)+ord(np)),PF(L,t)) + LoadP_data(np,t) - r(np,t) ;
+KCL4(np,t).. sum(L$(Line_data(L,'tbus')=card(S)+ord(np)),QF(L,t)) =e= sum(L$(Line_data(L,'fbus')=card(S)+ord(np)),QF(L,t)) + LoadQ_data(np,t) - r(np,t) ;
 
 
 *KVL:   constraints are designed in a way to be relaxed when line is not in use.
-KVL1(L_ex,t).. sum(n,A(L_ex,n)*V(n,t)) =e= PF(L_ex,t)*Line_data(L_ex,"R") + QF(L_ex,t)*Line_data(L_ex,"X") ;
+* A /v1 is missing in KVL
+KVL1(L_ex,t).. sum(n,A(L_ex,n)*V(n,t)) =e= -(PF(L_ex,t)*Line_data(L_ex,"R") + QF(L_ex,t)*Line_data(L_ex,"X"))/Vref ;
 KVL21(L_can,t).. sum(n,A(L_can,n)*V(n,t)) - PF(L_can,t)*Line_data(L_can,"R") - QF(L_can,t)*Line_data(L_can,"X") =g= (XI(L_can,t) - 1)*M  ;
 KVL22(L_can,t).. sum(n,A(L_can,n)*V(n,t)) - PF(L_can,t)*Line_data(L_can,"R") - QF(L_can,t)*Line_data(L_can,"X") =l= (1 - XI(L_can,t))*M  ;
 
@@ -168,9 +178,9 @@ eq_exSub2(S_ex,t).. Qprod(S_ex,t) =l= (1 - ZR(S_ex,t))*node_data(S_ex,'Qsmax') +
 
 *to ensure only one replacement or installation
 eq_Line_rep(L_ex,t).. XR(L_ex,t) =g= XR(L_ex,t-1) ;
-eq_Line_ins(L_can,t).. XI(L_can,t) =g= XI(L_can,t-1) ;
+*eq_Line_ins(L_can,t).. XI(L_can,t) =g= XI(L_can,t-1) ;
 eq_OnlyRep1(L_ex).. sum(t,XR(L_ex,t)) =l= 1 ;
-eq_OnlyRep2(L_can).. sum(t,XI(L_can,t)) =l= 1 ;
+*eq_OnlyRep2(L_can).. sum(t,XI(L_can,t)) =l= 1 ;
 
 eq_ZOnce1(S_can,t).. Z1(S_can,t) =g= Z1(S_can,t-1) ;
 eq_ZOnce2(S_can,t).. Z2(S_can,t) =g= Z2(S_can,t-1) ;
@@ -181,8 +191,9 @@ eq_ZROnce(S_ex,t).. ZR(S_ex,t) =g= ZR(S_ex,t-1) ;
 
 
 *Node Voltage limitations
-*eq_Vmax(n,t).. V(n,t) =l= Node_data(n,"Vmax") ;
-*eq_Vmin(n,t).. V(n,t) =g= Node_data(n,"Vmin") ;
+eq_referenceV(S,t).. V(S,t) =e= Vref ;
+*eq_Vmax(np,t).. V(np,t) =l= Node_data(np,"Vmax") ;
+*eq_Vmin(np,t).. V(np,t) =g= Node_data(np,"Vmin") ;
 
 *mesh not allowed (N(t) is the bumber of nodes at each period):
 * 1: means no mesh
@@ -190,10 +201,11 @@ eq_ZROnce(S_ex,t).. ZR(S_ex,t) =g= ZR(S_ex,t-1) ;
 * 3 means substation nodes have no parent
 * 4
 Radiality1(t).. card(L_ex) + sum(L_can, XI(L_can,t)) =e= sum(S_can,Z1(S_can,t) + Z2(S_can,t)) + number_of_nodes(t) - 1 ;
-Radiality2(L_can,t).. sum((i,j)$((ord(i)=Line_data(L_can,'tbus')) and (ord(j) = Line_data(L_can,'fbus'))), B(i,j) + Bp(j,i) ) =e= XI(L_can,t) ;
-Radiality3(i).. sum(j,B(i,j)) =e= 1 ;
-Radiality4(S,j).. B(S,j) =e= 0
-
+*Radiality1(t).. 3 + sum(L_can, XI(L_can,t)) =e= sum(S_can,Z1(S_can,t) + Z2(S_can,t)) + number_of_nodes(t) - 1 ;
+Radiality2(L_can,t).. sum((i,j)$((ord(i)=Line_data(L_can,'tbus')) and (ord(j) = Line_data(L_can,'fbus'))), B(i,j,t) + Bp(j,i,t) ) =e= XI(L_can,t) ;
+Radiality3(i,t).. sum(j$( (ord(j)=Line_data(L,'fbus')) and (ord(i)=Line_data(L,'tbus')) ) ,B(i,j,t)) =e= 1 ;
+Radiality4(S,j,t).. B(S,j,t) =e= 0
+display LoadP_data
 model DNPlanning /all/ ;
 option optcr = 0.0 ;
 solve DNPlanning minimizing ObjFunc using mip;
