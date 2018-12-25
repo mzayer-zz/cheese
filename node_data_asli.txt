@@ -1,8 +1,8 @@
-	Psmax1	Qsmax1	IC1	Psmax2	Qsmax2	IC2	Vmax	Vmin
-n1	
-n2
-n3
-n4
+	Psmax1	Qsmax1	NIC1	Psmax2	Qsmax2	NIC2	Vmax	Vmin	Psmax	Qsmax	PsmaxR	QsmaxR	NRC
+n1	16	12	700000	24	18	900000			16	12	24	18	900000
+n2	16	12	700000	24	18	900000			16	12	24	18	900000
+n3	16	12	700000	24	18	900000			
+n4	16	12	700000	24	18	900000
 n5
 n6
 n7
